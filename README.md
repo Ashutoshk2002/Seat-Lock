@@ -7,6 +7,7 @@ Backend service for Seat Lock, built with [NestJS](https://nestjs.com).
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
+- [API Docs](#api-docs)
 - [Scripts](#scripts)
 - [Code Quality](#code-quality)
 - [Branching Strategy](#branching-strategy)
@@ -23,6 +24,7 @@ Backend service for Seat Lock, built with [NestJS](https://nestjs.com).
 | Language        | TypeScript                                                                                                          |
 | Package manager | pnpm                                                                                                                |
 | Testing         | Vitest + Supertest                                                                                                  |
+| API docs        | `@nestjs/swagger` (OpenAPI) + [Scalar](https://scalar.com)                                                          |
 | Linting         | [oxlint](https://oxc.rs) (type-aware)                                                                               |
 | Formatting      | Prettier                                                                                                            |
 | Git hooks       | Husky + lint-staged                                                                                                 |
@@ -64,6 +66,19 @@ const port = this.config.get('PORT', { infer: true }); // number
 ```
 
 **Adding a new variable:** add it to the schema in `env.validation.ts`, to `.env.example`, and to this table, all in the same PR.
+
+## API Docs
+
+The OpenAPI spec is generated from controllers and DTOs by `@nestjs/swagger` and rendered with [Scalar](https://scalar.com).
+
+| URL                                  | What                                                   |
+| ------------------------------------ | ------------------------------------------------------ |
+| http://localhost:3000/docs           | Interactive API reference (Scalar)                     |
+| http://localhost:3000/openapi.json   | Raw OpenAPI document (for Postman, client generation)  |
+
+Docs are enabled in every environment **except** `NODE_ENV=production`. Setup lives in [`src/common/docs/api-docs.ts`](src/common/docs/api-docs.ts).
+
+When adding endpoints, document them with `@nestjs/swagger` decorators (`@ApiTags`, `@ApiOperation`, `@ApiOkResponse`, `@ApiConflictResponse`, …) so the docs stay accurate.
 
 ## Scripts
 
