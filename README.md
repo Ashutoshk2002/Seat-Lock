@@ -1,114 +1,235 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Seat Lock
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend service for Seat Lock, built with [NestJS](https://nestjs.com).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Table of Contents
 
-## Description
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Getting Started](#getting-started)
+- [Scripts](#scripts)
+- [Code Quality](#code-quality)
+- [Branching Strategy](#branching-strategy)
+- [Branch Naming](#branch-naming)
+- [Commit Messages](#commit-messages)
+- [Pull Requests](#pull-requests)
+- [License](#license)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Tech Stack
 
-## Project setup
+| Area            | Tool                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Framework       | NestJS 12 (ESM)                                                                                                     |
+| Language        | TypeScript                                                                                                          |
+| Package manager | pnpm                                                                                                                |
+| Testing         | Vitest + Supertest                                                                                                  |
+| Linting         | [oxlint](https://oxc.rs) (type-aware)                                                                               |
+| Formatting      | Prettier                                                                                                            |
+| Git hooks       | Husky + lint-staged                                                                                                 |
+| Commits         | [Commitizen](https://github.com/commitizen/cz-cli) + [commitlint](https://commitlint.js.org) (Conventional Commits) |
 
-```bash
-$ pnpm install
-```
+## Prerequisites
 
-## Compile and run the project
+- **Node.js 24+**: the version is pinned in `.nvmrc`, so run `nvm use` in the project folder.
+- **pnpm 10**: run `corepack enable` once; Corepack then uses the version pinned in `package.json`.
 
-```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
-```
-
-## Run tests
+## Getting Started
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+git clone https://github.com/Ashutoshk2002/Seat-Lock.git
+cd Seat-Lock
+nvm use
+pnpm install        # also installs the Husky git hooks
+cp .env.example .env
+pnpm start:dev      # http://localhost:3000
 ```
 
-## Deployment
+### Environment Variables
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+All variables are documented in [`.env.example`](.env.example). Copy it to `.env` and adjust the values locally. `.env` is git-ignored and must never be committed.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Variable   | Default       | Description                                           |
+| ---------- | ------------- | ----------------------------------------------------- |
+| `NODE_ENV` | `development` | One of `development`, `test`, `staging`, `production` |
+| `PORT`     | `3000`        | Port the HTTP server listens on                       |
+
+`.env` is loaded at startup by `@nestjs/config` and validated with zod in [`src/config/env.validation.ts`](src/config/env.validation.ts). If a value is missing or invalid, the app refuses to start and prints which variable is wrong. Real environment variables take precedence over `.env`.
+
+Read config through the typed `ConfigService` instead of `process.env`:
+
+```ts
+constructor(private readonly config: ConfigService<Env, true>) {}
+
+const port = this.config.get('PORT', { infer: true }); // number
+```
+
+**Adding a new variable:** add it to the schema in `env.validation.ts`, to `.env.example`, and to this table, all in the same PR.
+
+## Scripts
+
+| Command             | Description                                |
+| ------------------- | ------------------------------------------ |
+| `pnpm start:dev`    | Start in watch mode                        |
+| `pnpm start:debug`  | Start in watch mode with debugger attached |
+| `pnpm build`        | Compile to `dist/`                         |
+| `pnpm start:prod`   | Run the compiled build                     |
+| `pnpm lint`         | Lint `src/` and `test/` with oxlint        |
+| `pnpm format`       | Format all files with Prettier             |
+| `pnpm format:check` | Check formatting without writing           |
+| `pnpm typecheck`    | Type-check with `tsc --noEmit`             |
+| `pnpm test`         | Run unit tests                             |
+| `pnpm test:watch`   | Run unit tests in watch mode               |
+| `pnpm test:cov`     | Run unit tests with coverage               |
+| `pnpm test:e2e`     | Run end-to-end tests                       |
+| `pnpm commit`       | Create a commit with the Commitizen prompt |
+
+## Code Quality
+
+These checks run automatically through Git hooks:
+
+| Hook         | What it runs                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `pre-commit` | `lint-staged`: oxlint `--fix` + Prettier on staged `.ts` files, Prettier on `json`/`md`/`yml` |
+| `commit-msg` | `commitlint`: rejects messages that don't follow Conventional Commits                         |
+
+Hooks only check staged files. Before opening a PR, run the full set locally:
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+> Do not bypass the hooks with `--no-verify`.
 
-## Observability
+## Branching Strategy
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+Work flows through three long-lived environment branches:
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+```
+feat/*  ─┐
+fix/*   ─┤
+chore/* ─┼──► dev ──► staging ──► prod
+...     ─┘
+```
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+| Branch    | Purpose                                       | Accepts PRs from     |
+| --------- | --------------------------------------------- | -------------------- |
+| `dev`     | Integration branch; all work lands here first | Short-lived branches |
+| `staging` | Pre-release testing / QA                      | `dev`                |
+| `prod`    | Production; always deployable                 | `staging`            |
 
-## Resources
+**Rules**
 
-Check out a few resources that may come in handy when working with NestJS:
+- `dev`, `staging` and `prod` are **protected**. Direct pushes are blocked, and every change goes through a pull request.
+- Always branch off the latest `dev`:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+  ```bash
+  git switch dev
+  git pull
+  git switch -c feat/seat-hold-timer
+  ```
 
-## Support
+- Open your PR into `dev`. After it's merged, delete your branch.
+- Promote by opening PRs **`dev → staging`**, then **`staging → prod`**. Never skip a stage.
+- Keep your branch up to date with `dev` (`git pull --rebase origin dev`) before opening or updating a PR.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Branch Naming
 
-## Stay in touch
+Format:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```
+<type>/<short-description>
+```
+
+- `type` is one of the types below; it matches the commit type of the work.
+- `short-description` is lowercase kebab-case, 2–5 words.
+- Optionally prefix the description with a ticket ID: `feat/SL-42-seat-hold-timer`.
+
+| Type        | Use for                              | Example                    |
+| ----------- | ------------------------------------ | -------------------------- |
+| `feat/`     | New feature                          | `feat/seat-hold-timer`     |
+| `fix/`      | Bug fix                              | `fix/double-booking-race`  |
+| `chore/`    | Tooling, config, dependencies        | `chore/project-setup`      |
+| `refactor/` | Code change with no behaviour change | `refactor/booking-service` |
+| `docs/`     | Documentation only                   | `docs/branching-guide`     |
+| `test/`     | Adding or fixing tests               | `test/lock-expiry-e2e`     |
+| `perf/`     | Performance improvement              | `perf/seat-query-index`    |
+
+Avoid: `Feature/SeatTimer`, `ashutosh-changes`, `fix`, `new_branch`.
+
+## Commit Messages
+
+We follow [Conventional Commits](https://www.conventionalcommits.org). commitlint enforces the format on every commit.
+
+### Format
+
+```
+<type>(<optional scope>): <subject>
+
+<optional body>
+
+<optional footer>
+```
+
+- **type**: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `perf`, `style`, `build`, `ci`, `revert`
+- **scope**: the module or area affected, e.g. `booking`, `auth`, `deps`
+- **subject**: imperative mood, lowercase, no trailing period, header ≤ 100 characters
+  - ✅ `add seat hold expiry`
+  - ❌ `Added seat hold expiry.`
+
+### Examples
+
+```
+feat(booking): add 10-minute seat hold expiry
+fix(lock): release lock when payment fails
+chore(deps): bump @nestjs/core to 12.0.2
+refactor(seat): extract availability check into service
+docs: add branching strategy to readme
+test(booking): cover concurrent lock requests
+```
+
+Breaking change:
+
+```
+feat(api)!: rename /seats/lock to /seats/hold
+
+BREAKING CHANGE: clients must call /seats/hold instead of /seats/lock.
+```
+
+### Using Commitizen (recommended)
+
+Instead of `git commit -m`, use the interactive prompt:
+
+```bash
+git add <files>
+pnpm commit
+```
+
+It walks you through:
+
+1. **Type** of change (`feat`, `fix`, ...)
+2. **Scope** (optional, e.g. `booking`)
+3. **Short description** (the subject)
+4. **Longer description** (optional body)
+5. **Breaking changes?**
+6. **Issues affected?** (e.g. `Closes #12`)
+
+Commitizen builds a valid message, then the hooks run as usual. `git commit -m "..."` still works, but commitlint rejects the commit if the message is not in the format above.
+
+### Good practices
+
+- One logical change per commit; don't mix a refactor with a feature.
+- Commit small and often.
+- Use the body to explain **why**, not what. The diff already shows what.
+- Reference issues in the footer: `Closes #12`.
+
+## Pull Requests
+
+1. Push your branch and open a PR into `dev`. The [PR template](.github/pull_request_template.md) loads automatically; fill it in.
+2. Give the PR a title in commit format, e.g. `feat(booking): add seat hold expiry`.
+3. Make sure lint, format, typecheck, tests and build all pass locally.
+4. Get at least one approval before merging.
+5. Merge, then delete the branch.
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+[MIT](LICENSE)
