@@ -7,6 +7,9 @@ import { API_DOCS_PATH, setupApiDocs } from "./common/docs/api-docs.js";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.enableShutdownHooks();
+
   const config = app.get(ConfigService<Env, true>);
   const port = config.get("PORT", { infer: true });
   const docsEnabled = config.get("NODE_ENV", { infer: true }) !== "production";

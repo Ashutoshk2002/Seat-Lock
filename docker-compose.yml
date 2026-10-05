@@ -1,0 +1,49 @@
+name: seat-lock
+
+services:
+  # Local Postgres for development: `docker compose up -d`
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: seatlock
+      POSTGRES_PASSWORD: seatlock
+      POSTGRES_DB: seatlock
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      # Postgres 18+ images keep data under /var/lib/postgresql/<version>
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seatlock -d seatlock"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Production image, run locally: `docker compose --profile app up --build`
+  migrate:
+    profiles: [app]
+    build: .
+    image: seat-lock:local
+    command: ["node", "dist/database/migrate.js"]
+    environment:
+      DATABASE_URL: postgres://seatlock:seatlock@postgres:5432/seatlock
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    profiles: [app]
+    build: .
+    image: seat-lock:local
+    environment:
+      DATABASE_URL: postgres://seatlock:seatlock@postgres:5432/seatlock
+      PORT: 3000
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-data:
