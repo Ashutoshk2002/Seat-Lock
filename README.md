@@ -7,6 +7,9 @@ Backend service for Seat Lock, built with [NestJS](https://nestjs.com).
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
+- [Database](#database)
+- [Health Checks](#health-checks)
+- [Docker](#docker)
 - [API Docs](#api-docs)
 - [Scripts](#scripts)
 - [Code Quality](#code-quality)
@@ -23,6 +26,9 @@ Backend service for Seat Lock, built with [NestJS](https://nestjs.com).
 | Framework       | NestJS 12 (ESM)                                                                                                     |
 | Language        | TypeScript                                                                                                          |
 | Package manager | pnpm                                                                                                                |
+| Database        | PostgreSQL 18 + [Drizzle ORM](https://orm.drizzle.team) (`drizzle-kit` for migrations)                              |
+| Health checks   | `@nestjs/terminus`                                                                                                  |
+| Containers      | Docker (multi-stage image) + Docker Compose                                                                         |
 | Testing         | Vitest + Supertest                                                                                                  |
 | API docs        | `@nestjs/swagger` (OpenAPI) + [Scalar](https://scalar.com)                                                          |
 | Linting         | [oxlint](https://oxc.rs) (type-aware)                                                                               |
@@ -34,6 +40,7 @@ Backend service for Seat Lock, built with [NestJS](https://nestjs.com).
 
 - **Node.js 24+**: the version is pinned in `.nvmrc`, so run `nvm use` in the project folder.
 - **pnpm 10**: run `corepack enable` once; Corepack then uses the version pinned in `package.json`.
+- **Docker**: for the local Postgres database (Docker Desktop on macOS/Windows).
 
 ## Getting Started
 
@@ -41,19 +48,25 @@ Backend service for Seat Lock, built with [NestJS](https://nestjs.com).
 git clone https://github.com/Ashutoshk2002/Seat-Lock.git
 cd Seat-Lock
 nvm use
-pnpm install        # also installs the Husky git hooks
+pnpm install           # also installs the Husky git hooks
 cp .env.example .env
-pnpm start:dev      # http://localhost:3000
+docker compose up -d   # starts Postgres on localhost:5433
+pnpm db:migrate        # applies database migrations
+pnpm start:dev         # http://localhost:3000
 ```
+
+The app runs on your machine (fast watch mode and debugging); only Postgres runs in Docker.
 
 ### Environment Variables
 
 All variables are documented in [`.env.example`](.env.example). Copy it to `.env` and adjust the values locally. `.env` is git-ignored and must never be committed.
 
-| Variable   | Default       | Description                                           |
-| ---------- | ------------- | ----------------------------------------------------- |
-| `NODE_ENV` | `development` | One of `development`, `test`, `staging`, `production` |
-| `PORT`     | `3000`        | Port the HTTP server listens on                       |
+| Variable       | Default        | Description                                                        |
+| -------------- | -------------- | ------------------------------------------------------------------ |
+| `NODE_ENV`     | `development`  | One of `development`, `test`, `staging`, `production`              |
+| `PORT`         | `3000`         | Port the HTTP server listens on                                    |
+| `DATABASE_URL` | – (required)   | Postgres connection string, e.g. `postgres://user:pass@host:5432/db` |
+| `DB_POOL_MAX`  | `10`           | Max connections in the pool (use `1` on serverless)                |
 
 `.env` is loaded at startup by `@nestjs/config` and validated with zod in [`src/config/env.validation.ts`](src/config/env.validation.ts). If a value is missing or invalid, the app refuses to start and prints which variable is wrong. Real environment variables take precedence over `.env`.
 
@@ -66,6 +79,89 @@ const port = this.config.get('PORT', { infer: true }); // number
 ```
 
 **Adding a new variable:** add it to the schema in `env.validation.ts`, to `.env.example`, and to this table, all in the same PR.
+
+## Database
+
+PostgreSQL accessed through [Drizzle ORM](https://orm.drizzle.team). The client is provided globally by `DatabaseModule`:
+
+```ts
+import { DRIZZLE, type Database } from "@/database/database.constants.js";
+
+constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+```
+
+### Where things live
+
+| Path                                 | What                                                                  |
+| ------------------------------------ | --------------------------------------------------------------------- |
+| `src/modules/<feature>/*.schema.ts`  | Drizzle tables, next to the feature that owns them                    |
+| `src/database/schema.ts`             | Re-exports every table (used by the app and by drizzle-kit)           |
+| `src/database/database.module.ts`    | Connection pool + Drizzle client, closed on shutdown                  |
+| `src/database/migrate.ts`            | Production migration runner (no drizzle-kit needed)                   |
+| `migrations/`                        | Generated SQL migrations + snapshots, **committed to git**            |
+| `drizzle.config.ts`                  | drizzle-kit configuration                                             |
+
+Column names are written in camelCase in TypeScript and mapped to snake_case in Postgres automatically (`casing: "snake_case"`).
+
+### Migration workflow
+
+1. Change or add a table in a `*.schema.ts` file (and re-export it from `src/database/schema.ts`).
+2. `pnpm db:generate` creates a SQL file in `migrations/`. **Read the SQL.** On renames drizzle-kit asks whether it's a rename or a drop + create; choosing wrong loses data.
+3. `pnpm db:migrate` applies it locally.
+4. Commit the schema change, the SQL file and `migrations/meta/` together, and tick "Migration added" in the PR template.
+
+Rules:
+
+- Never edit a migration that has already been merged; write a new one.
+- Migrations are forward-only (no down migrations). Undo a change with a new migration.
+- For hand-written SQL or data backfills: `pnpm db:generate --custom --name=<name>`.
+- Never use `drizzle-kit push` against a shared database.
+
+### Deployed environments
+
+Run migrations as a separate step **before** starting the new version of the app:
+
+```bash
+node dist/database/migrate.js   # included in the Docker image
+```
+
+## Health Checks
+
+| Endpoint            | Checks                    | Use for                                                    |
+| ------------------- | ------------------------- | ---------------------------------------------------------- |
+| `GET /health`       | Process is up             | Liveness probe / Docker `HEALTHCHECK`                      |
+| `GET /health/ready` | Database reachable (≤ 3s) | Readiness probe / load balancer target health              |
+
+Liveness deliberately doesn't check the database, so a database outage doesn't make the platform restart every container. Readiness returns `503` while the database is unreachable.
+
+## Docker
+
+### Local database
+
+```bash
+docker compose up -d          # start Postgres (localhost:5433)
+docker compose stop           # stop it (data is kept)
+docker compose down -v        # remove it and delete all data
+```
+
+It's mapped to port **5433** so it doesn't clash with a Postgres already installed on your machine. Change it with `POSTGRES_PORT` (and update `DATABASE_URL`).
+
+### Production image
+
+The [`Dockerfile`](Dockerfile) builds a multi-stage image: dependencies → build → a minimal runtime with production dependencies only. It runs as a non-root user, sets `NODE_ENV=production` (so `/docs` is disabled), and has a `HEALTHCHECK` on `/health`.
+
+```bash
+docker build -t seat-lock .
+```
+
+To run the full production setup locally (Postgres → migrations → app):
+
+```bash
+docker compose --profile app up --build   # app on http://localhost:3000
+docker compose --profile app down
+```
+
+When deploying, provide `DATABASE_URL` (and any other variables) from the platform's secrets, and run `node dist/database/migrate.js` with the same image as a one-off task before the new app version starts.
 
 ## API Docs
 
@@ -95,7 +191,11 @@ When adding endpoints, document them with `@nestjs/swagger` decorators (`@ApiTag
 | `pnpm test`         | Run unit tests                             |
 | `pnpm test:watch`   | Run unit tests in watch mode               |
 | `pnpm test:cov`     | Run unit tests with coverage               |
-| `pnpm test:e2e`     | Run end-to-end tests                       |
+| `pnpm test:e2e`     | Run end-to-end tests (Postgres must be running) |
+| `pnpm db:generate`  | Generate a SQL migration from schema changes |
+| `pnpm db:migrate`   | Apply pending migrations (drizzle-kit)     |
+| `pnpm db:migrate:prod` | Apply migrations from the compiled build (no drizzle-kit) |
+| `pnpm db:studio`    | Open Drizzle Studio to browse the database |
 | `pnpm commit`       | Create a commit with the Commitizen prompt |
 
 ## Code Quality
