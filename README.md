@@ -2,6 +2,10 @@
 
 Backend service for Seat Lock, built with [NestJS](https://nestjs.com).
 
+SeatLock is event ticket booking that guarantees a seat is never sold twice, even when hundreds of users click the same seat at once: atomic multi-seat holds with a TTL, idempotent checkout, and deduplicated payment webhooks.
+
+**Design docs:** [System design](docs/system-design.md) · [Architecture (C4 + AWS)](docs/architecture.md) · [Plan & tracker](docs/plan.md) · [ADRs](docs/adr/)
+
 ## Table of Contents
 
 - [Tech Stack](#tech-stack)
